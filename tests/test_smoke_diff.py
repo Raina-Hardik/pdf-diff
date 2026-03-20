@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from pypdf import PdfWriter
@@ -125,3 +126,94 @@ def _write_test_pdf(path: Path, *, text: str) -> None:
 
     with path.open("wb") as handle:
         writer.write(handle)
+
+
+def test_diff_command_json_format(tmp_path: Path) -> None:
+    left = tmp_path / "left.md"
+    right = tmp_path / "right.md"
+
+    left.write_text("# Title\n\n- apples\n- oranges\n", encoding="utf-8")
+    right.write_text("# Title\n\n- apples\n- bananas\n", encoding="utf-8")
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "diff",
+            str(left),
+            str(right),
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    output_json = json.loads(result.output)
+
+    assert "left" in output_json
+    assert "right" in output_json
+    assert "stats" in output_json
+    assert "lines_added" in output_json["stats"]
+    assert "lines_removed" in output_json["stats"]
+    assert output_json["stats"]["lines_added"] > 0
+    assert output_json["stats"]["lines_removed"] > 0
+
+
+def test_diff_command_stat_output(tmp_path: Path) -> None:
+    left = tmp_path / "left.md"
+    right = tmp_path / "right.md"
+
+    left.write_text("# Title\n\n- apples\n- oranges\n- grapes\n", encoding="utf-8")
+    right.write_text("# Title\n\n- apples\n- bananas\n", encoding="utf-8")
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "diff",
+            str(left),
+            str(right),
+            "--stat",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    stat_output = result.output
+
+    assert "Left file:" in stat_output
+    assert "Right file:" in stat_output
+    assert "Lines added:" in stat_output
+    assert "Lines removed:" in stat_output
+    assert "Total changes:" in stat_output
+
+
+def test_diff_command_lines_changed_only(tmp_path: Path) -> None:
+    left = tmp_path / "left.md"
+    right = tmp_path / "right.md"
+
+    left.write_text(
+        "# Title\n\nContext line\n- apples\n- oranges\nMore context\n",
+        encoding="utf-8",
+    )
+    right.write_text(
+        "# Title\n\nContext line\n- bananas\nMore context\n",
+        encoding="utf-8",
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "diff",
+            str(left),
+            str(right),
+            "--lines-changed",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    diff_output = result.output
+
+    assert "-" in diff_output
+    assert "+" in diff_output
+    assert "Context line" not in diff_output or diff_output.count("Context line") <= 1

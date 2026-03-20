@@ -213,6 +213,29 @@ def diff(
             help="pdfsmith backend to use when converting PDF inputs for diff.",
         ),
     ] = None,
+    format: Annotated[
+        str,
+        typer.Option(
+            "--format",
+            "-f",
+            help="Output format: plaintext, unified, or json.",
+            case_sensitive=False,
+        ),
+    ] = "plaintext",
+    stat: Annotated[
+        bool,
+        typer.Option(
+            "--stat",
+            help="Show summary statistics instead of full diff.",
+        ),
+    ] = False,
+    lines_changed: Annotated[
+        bool,
+        typer.Option(
+            "--lines-changed",
+            help="Show only changed lines without context.",
+        ),
+    ] = False,
 ) -> None:
     configure_logging()
     chosen_renderer = resolve_diff_renderer(renderer)
@@ -227,6 +250,9 @@ def diff(
             right_markdown_path,
             renderer=chosen_renderer,
             context_lines=context_lines,
+            format=format.lower(),
+            stat=stat,
+            lines_changed=lines_changed,
         )
 
     if output is not None:
