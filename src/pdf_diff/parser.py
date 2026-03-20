@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from pdfsmith import parse_async as pdfsmith_parse_async
 from pdfsmith import parse as pdfsmith_parse
 from pypdf import PdfReader, PdfWriter
 
@@ -17,6 +19,44 @@ def convert_pdf_to_markdown(
     sections = _parse_pages_with_pdfsmith(input_pdf, backend=backend)
     markdown = "\n\n".join(section for section in sections if section)
     return f"{markdown}\n" if markdown else ""
+
+
+async def convert_pdf_to_markdown_async(
+    input_pdf: Path, *, keep_pages: bool = True, backend: str | None = None
+) -> str:
+    if keep_pages:
+        return await asyncio.to_thread(
+            convert_pdf_to_markdown,
+            input_pdf,
+            keep_pages=keep_pages,
+            backend=backend,
+        )
+
+    markdown = await pdfsmith_parse_async(input_pdf, backend=backend)
+    return _normalize_document_markdown(markdown)
+
+
+async def convert_pdfs_to_markdown_batch(
+    input_pdfs: list[Path],
+    *,
+    keep_pages: bool = True,
+    backend: str | None = None,
+    max_concurrency: int = 4,
+) -> dict[Path, str]:
+    semaphore = asyncio.Semaphore(max(1, max_concurrency))
+
+    async def _convert_one(pdf_path: Path) -> tuple[Path, str]:
+        async with semaphore:
+            markdown = await convert_pdf_to_markdown_async(
+                pdf_path,
+                keep_pages=keep_pages,
+                backend=backend,
+            )
+            return pdf_path, markdown
+
+    tasks = [_convert_one(pdf_path) for pdf_path in input_pdfs]
+    converted = await asyncio.gather(*tasks)
+    return {pdf_path: markdown for pdf_path, markdown in converted}
 
 
 def convert_pdf_with_ocr(input_pdf: Path) -> str:

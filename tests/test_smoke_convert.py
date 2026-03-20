@@ -25,6 +25,38 @@ def test_convert_command_writes_markdown(tmp_path: Path) -> None:
     assert "<!-- page: 1 -->" in markdown
 
 
+def test_convert_many_command_writes_all_markdown_outputs(tmp_path: Path) -> None:
+    input_pdf_a = tmp_path / "sample_a.pdf"
+    input_pdf_b = tmp_path / "sample_b.pdf"
+    output_dir = tmp_path / "batch_output"
+
+    _write_test_pdf(input_pdf_a, text="Batch A")
+    _write_test_pdf(input_pdf_b, text="Batch B")
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "convert-many",
+            str(input_pdf_a),
+            str(input_pdf_b),
+            "--output-dir",
+            str(output_dir),
+            "--jobs",
+            "2",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+
+    markdown_a = output_dir / "sample_a.md"
+    markdown_b = output_dir / "sample_b.md"
+    assert markdown_a.exists()
+    assert markdown_b.exists()
+    assert "Batch A" in markdown_a.read_text(encoding="utf-8")
+    assert "Batch B" in markdown_b.read_text(encoding="utf-8")
+
+
 def _write_test_pdf(path: Path, *, text: str) -> None:
     writer = PdfWriter()
     page = writer.add_blank_page(width=300, height=144)
