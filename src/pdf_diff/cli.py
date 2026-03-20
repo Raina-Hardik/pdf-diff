@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Annotated
 
 import typer
@@ -26,10 +27,14 @@ PdfArgument = Annotated[
     Path,
     typer.Argument(..., exists=True, dir_okay=False, readable=True, help="Path to the source PDF."),
 ]
-MarkdownArgument = Annotated[
+DiffInputArgument = Annotated[
     Path,
     typer.Argument(
-        ..., exists=True, dir_okay=False, readable=True, help="Path to a Markdown file."
+        ...,
+        exists=True,
+        dir_okay=False,
+        readable=True,
+        help="Path to an input file (.md or .pdf).",
     ),
 ]
 OutputOption = Annotated[
@@ -171,8 +176,8 @@ def convert_many(
 
 @app.command()
 def diff(
-    left: MarkdownArgument,
-    right: MarkdownArgument,
+    left: DiffInputArgument,
+    right: DiffInputArgument,
     output: Annotated[
         Path | None,
         typer.Option(
@@ -200,15 +205,29 @@ def diff(
             help="Number of context lines for unified diffs.",
         ),
     ] = 3,
+    backend: Annotated[
+        str | None,
+        typer.Option(
+            "--backend",
+            "-b",
+            help="pdfsmith backend to use when converting PDF inputs for diff.",
+        ),
+    ] = None,
 ) -> None:
     configure_logging()
     chosen_renderer = resolve_diff_renderer(renderer)
-    diff_output = diff_markdown_files(
-        left,
-        right,
-        renderer=chosen_renderer,
-        context_lines=context_lines,
-    )
+
+    with TemporaryDirectory(prefix="pdf_diff_inputs_") as temp_dir:
+        temp_root = Path(temp_dir)
+        left_markdown_path = _materialize_diff_input_as_markdown(left, temp_root, backend=backend)
+        right_markdown_path = _materialize_diff_input_as_markdown(right, temp_root, backend=backend)
+
+        diff_output = diff_markdown_files(
+            left_markdown_path,
+            right_markdown_path,
+            renderer=chosen_renderer,
+            context_lines=context_lines,
+        )
 
     if output is not None:
         output.parent.mkdir(parents=True, exist_ok=True)
@@ -217,6 +236,21 @@ def diff(
         return
 
     typer.echo(diff_output)
+
+
+def _materialize_diff_input_as_markdown(
+    input_path: Path,
+    temp_root: Path,
+    *,
+    backend: str | None,
+) -> Path:
+    if input_path.suffix.lower() == ".pdf":
+        markdown = convert_pdf_to_markdown(input_path, backend=backend)
+        temp_markdown_path = temp_root / f"{input_path.stem}.md"
+        temp_markdown_path.write_text(markdown, encoding="utf-8")
+        return temp_markdown_path
+
+    return input_path
 
 
 def main() -> None:
