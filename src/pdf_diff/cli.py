@@ -192,7 +192,7 @@ def diff(
         typer.Option(
             "--renderer",
             "-r",
-            help="Diff renderer: auto, unified, or delta.",
+            help="Diff renderer: auto, unified, ndiff, html, or delta (compat alias).",
             case_sensitive=False,
         ),
     ] = "auto",

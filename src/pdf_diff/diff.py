@@ -2,21 +2,22 @@ from __future__ import annotations
 
 import difflib
 import json
-import shutil
-import subprocess
 from pathlib import Path
 from typing import Any
 
 
 def resolve_diff_renderer(renderer: str) -> str:
     normalized = renderer.strip().lower()
-    if normalized not in {"auto", "unified", "delta"}:
-        raise ValueError(f"Unsupported renderer '{renderer}'. Use auto, unified, or delta.")
+    if normalized not in {"auto", "unified", "ndiff", "html", "delta"}:
+        raise ValueError(
+            f"Unsupported renderer '{renderer}'. Use auto, unified, ndiff, html, or delta."
+        )
 
     if normalized == "auto":
-        return "delta" if _delta_available() else "unified"
+        return "unified"
 
-    if normalized == "delta" and not _delta_available():
+    # Keep backward compatibility for prior CLI values while avoiding shell calls.
+    if normalized == "delta":
         return "unified"
 
     return normalized
@@ -48,9 +49,16 @@ def diff_markdown_files(
     """
     left_text = left.read_text(encoding="utf-8")
     right_text = right.read_text(encoding="utf-8")
+    chosen = resolve_diff_renderer(renderer)
 
     if format.lower() == "json":
         return _diff_to_json(left_text, right_text, str(left), str(right))
+
+    if chosen == "html":
+        return _html_diff(left_text, right_text, from_path=str(left), to_path=str(right))
+
+    if chosen == "ndiff":
+        return _ndiff(left_text, right_text)
 
     unified = _unified_diff(
         left_text,
@@ -66,11 +74,6 @@ def diff_markdown_files(
 
     if lines_changed:
         return _lines_changed_only(unified)
-
-    chosen = resolve_diff_renderer(renderer)
-
-    if chosen == "delta":
-        return _render_with_delta(unified)
 
     return unified
 
@@ -92,6 +95,24 @@ def _unified_diff(
         lineterm="",
     )
     return "\n".join(diff_lines)
+
+
+def _ndiff(left_text: str, right_text: str) -> str:
+    diff_lines = difflib.ndiff(left_text.splitlines(), right_text.splitlines())
+    return "\n".join(diff_lines)
+
+
+def _html_diff(left_text: str, right_text: str, *, from_path: str, to_path: str) -> str:
+    html = difflib.HtmlDiff(wrapcolumn=100)
+    return html.make_file(
+        fromlines=left_text.splitlines(),
+        tolines=right_text.splitlines(),
+        fromdesc=from_path,
+        todesc=to_path,
+        context=True,
+        numlines=3,
+        charset="utf-8",
+    )
 
 
 def _diff_to_json(
@@ -170,24 +191,3 @@ def _lines_changed_only(unified_diff: str) -> str:
             result_lines.append(line)
 
     return "\n".join(result_lines)
-
-
-def _render_with_delta(unified_diff_text: str) -> str:
-    delta = shutil.which("delta")
-    if delta is None:
-        return unified_diff_text
-
-    result = subprocess.run(
-        [delta, "--no-gitconfig", "--paging=never"],
-        input=unified_diff_text,
-        text=True,
-        capture_output=True,
-    )
-    if result.returncode not in (0, 1):
-        return unified_diff_text
-
-    return result.stdout or unified_diff_text
-
-
-def _delta_available() -> bool:
-    return shutil.which("delta") is not None

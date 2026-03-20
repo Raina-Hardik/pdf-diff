@@ -217,3 +217,75 @@ def test_diff_command_lines_changed_only(tmp_path: Path) -> None:
     assert "-" in diff_output
     assert "+" in diff_output
     assert "Context line" not in diff_output or diff_output.count("Context line") <= 1
+
+
+def test_diff_command_renderer_ndiff(tmp_path: Path) -> None:
+    left = tmp_path / "left.md"
+    right = tmp_path / "right.md"
+
+    left.write_text("alpha\nbeta\n", encoding="utf-8")
+    right.write_text("alpha\ngamma\n", encoding="utf-8")
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "diff",
+            str(left),
+            str(right),
+            "--renderer",
+            "ndiff",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "- beta" in result.output
+    assert "+ gamma" in result.output
+
+
+def test_diff_command_renderer_html(tmp_path: Path) -> None:
+    left = tmp_path / "left.md"
+    right = tmp_path / "right.md"
+
+    left.write_text("alpha\nbeta\n", encoding="utf-8")
+    right.write_text("alpha\ngamma\n", encoding="utf-8")
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "diff",
+            str(left),
+            str(right),
+            "--renderer",
+            "html",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "<!DOCTYPE html" in result.output
+    assert "gamma" in result.output
+
+
+def test_diff_command_renderer_delta_alias_maps_to_unified(tmp_path: Path) -> None:
+    left = tmp_path / "left.md"
+    right = tmp_path / "right.md"
+
+    left.write_text("alpha\nbeta\n", encoding="utf-8")
+    right.write_text("alpha\ngamma\n", encoding="utf-8")
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "diff",
+            str(left),
+            str(right),
+            "--renderer",
+            "delta",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "---" in result.output
+    assert "+++" in result.output
