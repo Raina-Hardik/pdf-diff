@@ -13,6 +13,7 @@ Legend:
 | Version | Date | Summary |
 |---|---|---|
 | 0.0.1 | 2026-03-20 | Initial public release: convert pipeline scaffold, backend selection flag, smoke tests, and OSS-safe project baseline |
+| 0.1.0 | 2026-03-20 | Rich diff output formats: JSON, summary statistics, lines-changed-only mode for programmatic consumption and enhanced reporting |
 
 ## Feature Matrix
 
@@ -37,6 +38,9 @@ Legend:
 | Markdown diff engine integration | implemented | core | 0.0.1 | Unified diff is now wired and functional |
 | Diff smoke test | implemented | test | 0.0.1 | Verifies CLI diff output and persisted diff artifacts |
 | PDF vs PDF diff workflow (via Markdown conversion) | planned | core | TBD | Planned model: PDF -> MD vs PDF -> MD |
+| Diff output format: JSON | implemented | core | 0.1.0 | Structured JSON with stats and change metadata |
+| Diff output format: summary statistics | implemented | core | 0.1.0 | Show lines added/removed with --stat flag |
+| Diff output format: lines-changed-only | implemented | core | 0.1.0 | Show only changed lines without context using --lines-changed |
 | OCR conversion path (`--ocr`) | deferred | core | TBD | Currently raises NotImplementedError by design |
 | OCR optional dependency group wiring | deferred | packaging | TBD | Deferred due to dependency constraints with current stack |
 | Optional delta dependency group wiring | proposed | packaging | TBD | CLI can use external `delta`; Python optional group remains a placeholder |
@@ -46,8 +50,7 @@ Legend:
 
 | Priority | Item | Target Version |
 |---|---|---|
-| high | Add PDF-vs-PDF convenience command that converts both and diffs outputs | 0.1.0 |
-| high | Add richer diff output modes/reporting on top of wired unified engine | 0.1.0 |
+| high | Add PDF-vs-PDF convenience command that converts both and diffs outputs | 0.1.x |
 | medium | Expand conversion tests with backend-specific smoke matrix | 0.1.x |
 | medium | Add OCR implementation behind optional group once constraints are resolved | 0.2.0 |
 
